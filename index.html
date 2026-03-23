@@ -1,0 +1,1331 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+    <title>PHP Compiler | Analyseur Lexical & Syntaxique</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        /* --- Styles identiques à la version précédente (inchangés) --- */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #0a192f;
+            color: #e6f1ff;
+            line-height: 1.5;
+            overflow-x: hidden;
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        body.light-mode {
+            background: #f5f7fa;
+            color: #1e2a3a;
+        }
+        body.light-mode .hero-demo,
+        body.light-mode .feature-card,
+        body.light-mode .contact-info,
+        body.light-mode .contact-form {
+            background: rgba(255, 255, 255, 0.9);
+            border-color: rgba(0, 0, 0, 0.1);
+            color: #1e2a3a;
+        }
+        body.light-mode .demo-title,
+        body.light-mode .section-title,
+        body.light-mode .contact-info h3,
+        body.light-mode .contact-form h3 {
+            color: #2c3e50;
+        }
+        body.light-mode .token-output,
+        body.light-mode .code-editor {
+            background: #fff;
+            border-color: #d1d9e8;
+        }
+        body.light-mode #codeInput,
+        body.light-mode .token-output {
+            color: #2c3e50;
+            background: #fff;
+        }
+        body.light-mode .token-type {
+            color: #007bff;
+        }
+        body.light-mode .token-value {
+            color: #2c3e50;
+        }
+        body.light-mode .token-line-num {
+            color: #6c757d;
+        }
+        body.light-mode .demo-btn {
+            background: #e9ecef;
+            border-color: #ced4da;
+            color: #2c3e50;
+        }
+        body.light-mode .demo-btn:hover {
+            background: #dee2e6;
+        }
+        body.light-mode footer {
+            border-top-color: #dee2e6;
+            color: #6c757d;
+        }
+        body.light-mode .about {
+            background: rgba(0,0,0,0.03);
+        }
+
+        /* Canvas de particules */
+        #bg-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 24px;
+        }
+
+        /* Header */
+        header {
+            backdrop-filter: blur(12px);
+            background: rgba(10, 25, 47, 0.7);
+            border-bottom: 1px solid rgba(100, 255, 218, 0.2);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        body.light-mode header {
+            background: rgba(255, 255, 255, 0.8);
+            border-bottom-color: #d1d9e8;
+        }
+        .nav-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 0;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+        .logo-area {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .logo-placeholder {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+        .logo-placeholder img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .logo-text {
+            font-size: 1.5rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #00d2ff, #64ffda);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .nav-links a {
+            position: relative;
+            text-decoration: none;
+            color: #e6f1ff;
+            font-weight: 500;
+            transition: color 0.2s;
+        }
+        body.light-mode .nav-links a {
+            color: #2c3e50;
+        }
+        .nav-links a::after {
+            content: '';
+            position: absolute;
+            bottom: -4px;
+            left: 0;
+            width: 0;
+            height: 2px;
+            background: linear-gradient(90deg, #00d2ff, #64ffda);
+            transition: width 0.3s ease;
+        }
+        .nav-links a:hover {
+            color: #64ffda;
+        }
+        .nav-links a:hover::after,
+        .nav-links a.active::after {
+            width: 100%;
+        }
+        .nav-links a.active {
+            color: #64ffda;
+        }
+        .menu-toggle {
+            display: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: #e6f1ff;
+        }
+        body.light-mode .menu-toggle {
+            color: #2c3e50;
+        }
+
+        /* Hero */
+        .hero {
+            min-height: 80vh;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 3rem;
+            padding: 4rem 0;
+        }
+        .hero-content {
+            flex: 1;
+        }
+        .hero-content h1 {
+            font-size: clamp(2rem, 6vw, 3.2rem);
+            font-weight: 700;
+            background: linear-gradient(135deg, #fff, #64ffda);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            margin-bottom: 1rem;
+        }
+        .hero-content p {
+            font-size: clamp(1rem, 4vw, 1.2rem);
+            color: #8892b0;
+            margin-bottom: 2rem;
+        }
+        body.light-mode .hero-content p {
+            color: #4a5b6e;
+        }
+        .hero-buttons {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #00d2ff, #64ffda);
+            padding: 12px 28px;
+            border-radius: 40px;
+            font-weight: 600;
+            color: #0a192f;
+            text-decoration: none;
+            transition: transform 0.2s;
+            display: inline-block;
+        }
+        .btn-secondary {
+            background: transparent;
+            border: 1px solid #64ffda;
+            padding: 12px 28px;
+            border-radius: 40px;
+            font-weight: 600;
+            color: #64ffda;
+            text-decoration: none;
+            transition: all 0.2s;
+        }
+        body.light-mode .btn-secondary {
+            border-color: #2c3e50;
+            color: #2c3e50;
+        }
+        .btn-primary:hover, .btn-secondary:hover {
+            transform: translateY(-2px);
+        }
+        .hero-demo {
+            flex: 1;
+            background: rgba(17, 34, 64, 0.7);
+            backdrop-filter: blur(8px);
+            border-radius: 24px;
+            padding: 1.5rem;
+            border: 1px solid rgba(100, 255, 218, 0.2);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+        }
+        .demo-title {
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: #64ffda;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+        .code-editor {
+            background: #0a192f;
+            border: 1px solid #2c3e50;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        #codeInput {
+            width: 100%;
+            background: #0a192f;
+            border: none;
+            padding: 12px;
+            color: #e6f1ff;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            resize: vertical;
+            outline: none;
+        }
+        .demo-actions {
+            display: flex;
+            gap: 1rem;
+            margin: 1rem 0;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .demo-btn {
+            background: #00d2ff20;
+            border: 1px solid #00d2ff;
+            padding: 8px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: 0.2s;
+            font-size: 0.9rem;
+        }
+        .demo-btn:hover {
+            background: #00d2ff40;
+        }
+        .token-output {
+            background: #0a192f;
+            border-radius: 12px;
+            padding: 12px;
+            font-family: monospace;
+            font-size: 0.8rem;
+            max-height: 250px;
+            overflow-y: auto;
+            border: 1px solid #2c3e50;
+        }
+        .token-line {
+            padding: 4px 0;
+            border-bottom: 1px solid #1e2a3a;
+            font-family: monospace;
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .token-type {
+            color: #64ffda;
+            min-width: 100px;
+        }
+        .token-value {
+            color: #e6f1ff;
+            word-break: break-all;
+        }
+        .token-line-num {
+            color: #8892b0;
+            min-width: 50px;
+        }
+
+        /* Features */
+        .features {
+            padding: 5rem 0;
+        }
+        .section-title {
+            text-align: center;
+            font-size: clamp(1.8rem, 5vw, 2rem);
+            margin-bottom: 3rem;
+            color: #64ffda;
+        }
+        body.light-mode .section-title {
+            color: #2c3e50;
+        }
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 2rem;
+        }
+        .feature-card {
+            background: rgba(17, 34, 64, 0.6);
+            backdrop-filter: blur(4px);
+            border-radius: 20px;
+            padding: 1.8rem;
+            border: 1px solid rgba(100, 255, 218, 0.1);
+            transition: transform 0.3s, border-color 0.3s;
+        }
+        .feature-card:hover {
+            transform: translateY(-5px);
+            border-color: #64ffda;
+        }
+        .feature-icon {
+            font-size: 2rem;
+            margin-bottom: 1rem;
+            color: #00d2ff;
+        }
+        .feature-card h3 {
+            margin-bottom: 0.5rem;
+            font-size: 1.3rem;
+        }
+        .feature-card p {
+            color: #8892b0;
+            font-size: 0.95rem;
+        }
+        body.light-mode .feature-card p {
+            color: #4a5b6e;
+        }
+
+        /* About */
+        .about {
+            padding: 5rem 0;
+            background: rgba(10, 25, 47, 0.5);
+            text-align: center;
+        }
+        .about-content {
+            max-width: 700px;
+            margin: 0 auto;
+            padding: 0 1rem;
+        }
+        .about-content p {
+            margin: 1rem 0;
+        }
+
+        /* Contact */
+        .contact {
+            padding: 5rem 0;
+        }
+        .contact-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+        }
+        .contact-info, .contact-form {
+            background: rgba(17, 34, 64, 0.6);
+            backdrop-filter: blur(4px);
+            border-radius: 20px;
+            padding: 2rem;
+            border: 1px solid rgba(100, 255, 218, 0.1);
+        }
+        .contact-info h3, .contact-form h3 {
+            margin-bottom: 1rem;
+            color: #64ffda;
+        }
+        .contact-detail {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            color: #8892b0;
+            flex-wrap: wrap;
+        }
+        .contact-detail i {
+            width: 32px;
+            color: #00d2ff;
+        }
+        .contact-detail a {
+            color: #e6f1ff;
+            text-decoration: none;
+            transition: color 0.2s;
+            word-break: break-all;
+        }
+        .contact-detail a:hover {
+            color: #64ffda;
+        }
+        .form-group {
+            margin-bottom: 1rem;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #e6f1ff;
+        }
+        .form-group input, .form-group textarea {
+            width: 100%;
+            padding: 0.8rem;
+            background: #0a192f;
+            border: 1px solid #2c3e50;
+            border-radius: 8px;
+            color: #e6f1ff;
+            font-family: inherit;
+        }
+        .form-group input:focus, .form-group textarea:focus {
+            outline: none;
+            border-color: #64ffda;
+        }
+        .submit-btn {
+            background: linear-gradient(135deg, #00d2ff, #64ffda);
+            border: none;
+            padding: 10px 24px;
+            border-radius: 30px;
+            font-weight: 600;
+            color: #0a192f;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .submit-btn:hover {
+            transform: translateY(-2px);
+        }
+
+        /* Footer */
+        footer {
+            background: rgba(10, 25, 47, 0.8);
+            border-top: 1px solid #1e2a3a;
+            padding: 3rem 0 2rem;
+            margin-top: 2rem;
+        }
+        .footer-content {
+            max-width: 1000px;
+            margin: 0 auto;
+            text-align: center;
+        }
+        .footer-description {
+            margin-bottom: 2rem;
+            line-height: 1.8;
+            color: #8892b0;
+            font-size: 0.95rem;
+            text-align: justify;
+        }
+        .footer-description p {
+            margin-bottom: 1rem;
+        }
+        .rotating-phrase {
+            font-size: 1rem;
+            font-style: italic;
+            margin: 1.5rem 0;
+            padding: 0.5rem;
+            border-top: 1px dashed #2c3e50;
+            border-bottom: 1px dashed #2c3e50;
+            display: inline-block;
+            color: #64ffda;
+            transition: opacity 0.5s;
+        }
+        body.light-mode .rotating-phrase {
+            color: #00d2ff;
+            border-color: #ced4da;
+        }
+        .footer-copyright {
+            font-size: 0.85rem;
+            color: #6c757d;
+            border-top: 1px solid #2c3e50;
+            padding-top: 1.5rem;
+            margin-top: 1rem;
+        }
+        body.light-mode footer {
+            background: rgba(255, 255, 255, 0.9);
+            border-top-color: #dee2e6;
+        }
+        body.light-mode .footer-description {
+            color: #4a5b6e;
+        }
+        body.light-mode .footer-copyright {
+            color: #6c757d;
+            border-top-color: #dee2e6;
+        }
+
+        /* Paramètre flottant */
+        .settings-float {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 50px;
+            height: 50px;
+            background: #00d2ff;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+            z-index: 1000;
+            transition: transform 0.3s ease;
+        }
+        .settings-float:hover {
+            transform: rotate(360deg) scale(1.05);
+        }
+        .settings-float i {
+            font-size: 24px;
+            color: #0a192f;
+        }
+        body.light-mode .settings-float {
+            background: #2c3e50;
+        }
+        body.light-mode .settings-float i {
+            color: white;
+        }
+
+        /* Panneau de paramètres */
+        .settings-panel {
+            position: fixed;
+            bottom: 80px;
+            right: 20px;
+            width: 300px;
+            background: rgba(30, 30, 46, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            padding: 1.2rem;
+            border: 1px solid #00d2ff;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+            z-index: 1000;
+            transition: opacity 0.2s, transform 0.2s;
+            opacity: 0;
+            transform: translateY(20px);
+            pointer-events: none;
+        }
+        .settings-panel.show {
+            opacity: 1;
+            transform: translateY(0);
+            pointer-events: auto;
+        }
+        .settings-panel h4 {
+            margin-bottom: 1rem;
+            color: #64ffda;
+            font-size: 1.1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .settings-panel h4 i {
+            cursor: pointer;
+            font-size: 1rem;
+        }
+        .settings-panel .setting-item {
+            margin-bottom: 1rem;
+        }
+        .settings-panel label {
+            display: block;
+            font-size: 0.85rem;
+            margin-bottom: 0.3rem;
+            color: #c0ffb0;
+        }
+        .settings-panel select, .settings-panel input[type="range"], .settings-panel input[type="number"] {
+            width: 100%;
+            padding: 6px 10px;
+            border-radius: 8px;
+            background: #0a192f;
+            border: 1px solid #2c3e50;
+            color: white;
+        }
+        .settings-panel input[type="checkbox"] {
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+        .settings-panel .checkbox-label {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+        }
+        body.light-mode .settings-panel {
+            background: rgba(255, 255, 255, 0.95);
+            border-color: #2c3e50;
+        }
+        body.light-mode .settings-panel label {
+            color: #2c3e50;
+        }
+        body.light-mode .settings-panel select,
+        body.light-mode .settings-panel input[type="range"],
+        body.light-mode .settings-panel input[type="number"] {
+            background: #f8f9fa;
+            border-color: #ced4da;
+            color: #2c3e50;
+        }
+
+        /* Responsive */
+        @media (max-width: 992px) {
+            .container {
+                padding: 0 20px;
+            }
+            .hero {
+                padding: 3rem 0;
+            }
+        }
+        @media (max-width: 768px) {
+            .menu-toggle {
+                display: block;
+            }
+            .nav-links {
+                display: none;
+                width: 100%;
+                flex-direction: column;
+                align-items: center;
+                gap: 1rem;
+                padding: 1rem 0;
+            }
+            .nav-links.active {
+                display: flex;
+            }
+            .hero {
+                flex-direction: column;
+                text-align: center;
+                gap: 2rem;
+            }
+            .hero-buttons {
+                justify-content: center;
+            }
+            .hero-demo {
+                width: 100%;
+            }
+            .contact-grid {
+                grid-template-columns: 1fr;
+                gap: 1.5rem;
+            }
+            .features-grid {
+                grid-template-columns: 1fr;
+                gap: 1rem;
+            }
+            .feature-card {
+                padding: 1.2rem;
+            }
+            .contact-info, .contact-form {
+                padding: 1.5rem;
+            }
+            .demo-actions {
+                gap: 0.8rem;
+            }
+            .demo-btn {
+                padding: 6px 12px;
+                font-size: 0.8rem;
+            }
+            .token-line {
+                flex-direction: column;
+                gap: 4px;
+            }
+            .settings-panel {
+                width: 260px;
+                right: 10px;
+                bottom: 70px;
+            }
+        }
+        @media (max-width: 480px) {
+            .container {
+                padding: 0 16px;
+            }
+            .logo-text {
+                font-size: 1.2rem;
+            }
+            .logo-placeholder {
+                width: 40px;
+                height: 40px;
+            }
+            .btn-primary, .btn-secondary {
+                padding: 8px 20px;
+                font-size: 0.9rem;
+            }
+            .hero-demo {
+                padding: 1rem;
+            }
+            .section-title {
+                font-size: 1.6rem;
+            }
+            .contact-detail {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 0.3rem;
+            }
+            .contact-detail i {
+                width: auto;
+            }
+        }
+    </style>
+</head>
+<body>
+    <canvas id="bg-canvas"></canvas>
+
+    <header>
+        <div class="container">
+            <div class="nav-bar">
+                <div class="logo-area">
+                    <div class="logo-placeholder">
+                        <img src="logo.ico" alt="Logo PHP Compiler">
+                    </div>
+                    <div class="logo-text">PHP Compiler</div>
+                </div>
+                <div class="menu-toggle" id="menuToggle">
+                    <i class="fas fa-bars"></i>
+                </div>
+                <div class="nav-links" id="navLinks">
+                    <a href="#features">Fonctionnalités</a>
+                    <a href="#about">À propos</a>
+                    <a href="#contact">Contact</a>
+                    <a href="#demo">Démo</a>
+                    <a href="#download-section" id="downloadLink">Télécharger</a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <div class="container">
+            <div class="hero">
+                <div class="hero-content">
+                    <h1>Analyseur Lexical &<br>Syntaxique PHP</h1>
+                    <p>Un compilateur minimaliste et puissant pour valider et analyser vos scripts PHP. Détection d'erreurs en temps réel, table des tokens, gestion de projet et bien plus.</p>
+                    <div class="hero-buttons">
+                        <a href="#demo" class="btn-primary">Essayer la démo</a>
+                        <a href="#" class="btn-secondary" id="learnMore">En savoir plus</a>
+                    </div>
+                </div>
+                <div class="hero-demo" id="demo">
+                    <div class="demo-title">
+                        <span><i class="fas fa-terminal"></i> Tokeniseur en direct</span>
+                        <span style="font-size:0.8rem;">(analyse à chaque frappe)</span>
+                    </div>
+                    <div class="code-editor">
+                        <textarea id="codeInput" rows="8"><?php
+$x = 10;
+if ($x > 5) {
+    echo "Succès";
+}
+?></textarea>
+                    </div>
+                    <div class="demo-actions">
+                        <button class="demo-btn" id="resetBtn"><i class="fas fa-undo-alt"></i> Réinitialiser</button>
+                        <button class="demo-btn" id="clearBtn"><i class="fas fa-trash-alt"></i> Effacer</button>
+                        <button class="demo-btn" id="compileBtn"><i class="fas fa-play"></i> Compiler</button>
+                    </div>
+                    <div class="token-output" id="tokenOutput">
+                        <div class="token-line">Analyse en temps réel – tapez du code PHP !</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="features" id="features">
+            <div class="container">
+                <h2 class="section-title">Caractéristiques</h2>
+                <div class="features-grid">
+                    <div class="feature-card">
+                        <div class="feature-icon"><i class="fas fa-code-branch"></i></div>
+                        <h3>Analyse Lexicale & Syntaxique</h3>
+                        <p>Tokenisation précise et validation de la grammaire PHP.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon"><i class="fas fa-clock"></i></div>
+                        <h3>Erreurs en temps réel</h3>
+                        <p>Détection instantanée des caractères inconnus et des erreurs syntaxiques.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon"><i class="fas fa-folder-open"></i></div>
+                        <h3>Gestion de projets</h3>
+                        <p>Ouvrez un dossier entier et naviguez dans vos fichiers PHP.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon"><i class="fas fa-chart-line"></i></div>
+                        <h3>Statistiques détaillées</h3>
+                        <p>Lignes, commentaires, fonctions, classes et plus encore.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon"><i class="fas fa-info-circle"></i></div>
+                        <h3>Documentation intégrée</h3>
+                        <p>Survolez un mot‑clé PHP pour afficher sa description.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon"><i class="fas fa-expand"></i></div>
+                        <h3>Mode plein écran</h3>
+                        <p>Concentrez‑vous sur votre code avec une interface immersive.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Section "À propos" avec un identifiant pour ancrage -->
+        <div class="about" id="about">
+            <div class="container about-content">
+                <h2 class="section-title">À propos</h2>
+                <p>Ce compilateur PHP a été développé par <strong>Samou & Amine</strong> dans le cadre d'un projet académique. Il offre un environnement complet d'analyse de code PHP, avec une interface moderne et des outils de productivité.</p>
+                <p>L'application JavaFX est disponible en téléchargement et vous permet d'exploiter toutes ces fonctionnalités hors ligne.</p>
+                <button class="btn-primary" id="downloadBtn2" style="margin-top: 1rem;">Télécharger l'application</button>
+            </div>
+        </div>
+
+        <div class="contact" id="contact">
+            <div class="container">
+                <h2 class="section-title">Contactez-nous</h2>
+                <div class="contact-grid">
+                    <div class="contact-info">
+                        <h3><i class="fas fa-address-card"></i> Coordonnées</h3>
+                        <div class="contact-detail">
+                            <i class="fas fa-envelope"></i>
+                            <a href="mailto:samoumegharba210@gmail.com">samoumegharba210@gmail.com</a>
+                        </div>
+                        <div class="contact-detail">
+                            <i class="fas fa-envelope"></i>
+                            <a href="mailto:merzoukamine47@gmail.com">merzoukamine47@gmail.com</a>
+                        </div>
+                        <div class="contact-detail">
+                            <i class="fab fa-github"></i>
+                            <a href="https://github.com/SAMOU2" target="_blank">github.com/SAMOU2</a>
+                        </div>
+                        <div class="contact-detail">
+                            <i class="fab fa-linkedin"></i>
+                            <a href="https://www.linkedin.com/in/samou-megharba" target="_blank">Samou Megharba</a>
+                        </div>
+                    </div>
+                    <div class="contact-form">
+                        <h3><i class="fas fa-paper-plane"></i> Envoyez-nous un message</h3>
+                        <form action="https://formspree.io/f/mbdzwadz" method="POST">
+                            <div class="form-group">
+                                <label>Votre nom</label>
+                                <input type="text" name="name" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Votre email</label>
+                                <input type="email" name="_replyto" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Message</label>
+                                <textarea name="message" rows="4" required></textarea>
+                            </div>
+                            <button type="submit" class="submit-btn">Envoyer</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-description">
+                    <p>Le <strong>Mini-Compilateur PHP</strong> est un projet développé par <strong>Samou Megharba</strong> et <strong>Amine Merzouk</strong>, étudiants en génie logiciel à l'Université Abderrahmane Mira de Béjaïa. Ce compilateur a été conçu dans le cadre d'un projet académique visant à maîtriser les concepts fondamentaux de la compilation : analyse lexicale, analyse syntaxique et gestion de tokens.</p>
+                    <p>L'application permet d'analyser du code PHP en temps réel, de détecter les erreurs lexicales et syntaxiques, d'afficher une table des tokens détaillée, et offre une interface moderne avec fond animé et paramètres interactifs. Elle intègre également des fonctionnalités avancées telles que la gestion de projets, les statistiques de code, la documentation intégrée via tooltips, et un mode plein écran.</p>
+                    <p>Notre objectif est de fournir un outil pédagogique et pratique pour les développeurs PHP débutants et confirmés, qui souhaitent comprendre le fonctionnement interne d'un compilateur ou simplement valider la syntaxe de leurs scripts. Le projet est entièrement open source et disponible sur GitHub.</p>
+                    <p>Ce site web de présentation offre une démo interactive du tokeniseur, ainsi que toutes les informations nécessaires pour télécharger et utiliser l'application JavaFX. N'hésitez pas à nous contacter pour toute question ou suggestion d'amélioration.</p>
+                </div>
+                <div class="rotating-phrase" id="rotatingPhrase">✨ Code propre, esprit clair ✨</div>
+                <div class="footer-copyright">
+                    <p>© 2026 Samou Megharba & Amine Merzouk – Mini-Compilateur PHP. Tous droits réservés. Conçu avec passion pour la programmation et la pédagogie.</p>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Paramètre flottant et panneau -->
+    <div class="settings-float" id="settingsFloat">
+        <i class="fas fa-cog"></i>
+    </div>
+    <div class="settings-panel" id="settingsPanel">
+        <h4>
+            Paramètres
+            <i class="fas fa-times" id="closeSettings"></i>
+        </h4>
+        <div class="setting-item">
+            <label>Thème</label>
+            <select id="themeSelect">
+                <option value="dark">Sombre</option>
+                <option value="light">Clair</option>
+            </select>
+        </div>
+        <div class="setting-item">
+            <label>Particules</label>
+            <div class="checkbox-label">
+                <input type="checkbox" id="showConnectionsCheckbox" checked> Afficher les connexions
+            </div>
+            <div style="margin-top: 5px;">
+                <input type="range" id="particleCountSlider" min="30" max="300" value="120" step="10">
+                <span id="particleCountValue">120</span>
+            </div>
+        </div>
+        <div class="setting-item">
+            <label>Vitesse des phrases (secondes)</label>
+            <input type="range" id="phraseSpeedSlider" min="2" max="10" step="0.5" value="5">
+            <span id="phraseSpeedValue">5</span>
+        </div>
+        <div class="setting-item">
+            <label>Taille police éditeur</label>
+            <select id="editorFontSize">
+                <option value="0.8rem">Petite</option>
+                <option value="0.9rem" selected>Normale</option>
+                <option value="1rem">Grande</option>
+            </select>
+        </div>
+    </div>
+
+    <script>
+        // === TÉLÉCHARGEMENT DE L'APPLICATION ===
+        function downloadApp() {
+            const fileUrl = 'app.exe';
+            const link = document.createElement('a');
+            link.href = fileUrl;
+            link.download = 'PHPCompiler.exe';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // Attacher l'événement au lien du menu pour faire défiler jusqu'à la section "À propos"
+        document.getElementById('downloadLink').addEventListener('click', function(e) {
+            e.preventDefault();
+            const targetSection = document.getElementById('about');
+            if (targetSection) {
+                targetSection.scrollIntoView({ behavior: 'smooth' });
+            }
+        });
+
+        // Attacher le téléchargement au bouton dans la section "À propos"
+        document.getElementById('downloadBtn2').addEventListener('click', downloadApp);
+
+        // --- Arrière-plan de particules (identique) ---
+        const canvas = document.getElementById('bg-canvas');
+        let ctx = canvas.getContext('2d');
+        let width, height;
+        let particles = [];
+        let mouseX = null, mouseY = null;
+        let particleCount = 120;
+        let showConnections = true;
+
+        function resizeCanvas() {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            canvas.width = width;
+            canvas.height = height;
+        }
+
+        function random(min, max) {
+            return Math.random() * (max - min) + min;
+        }
+
+        function initParticles(count) {
+            particles = [];
+            for (let i = 0; i < count; i++) {
+                particles.push({
+                    x: random(0, width),
+                    y: random(0, height),
+                    radius: random(1, 3),
+                    speedX: random(-0.5, 0.5),
+                    speedY: random(-0.5, 0.5),
+                    alpha: random(0.3, 0.8)
+                });
+            }
+        }
+
+        function drawParticles() {
+            ctx.clearRect(0, 0, width, height);
+            ctx.fillStyle = document.body.classList.contains('light-mode') ? '#f5f7fa' : '#0a192f';
+            ctx.fillRect(0, 0, width, height);
+
+            for (let p of particles) {
+                p.x += p.speedX;
+                p.y += p.speedY;
+
+                if (p.x < 0) p.x = width;
+                if (p.x > width) p.x = 0;
+                if (p.y < 0) p.y = height;
+                if (p.y > height) p.y = 0;
+
+                if (mouseX !== null && mouseY !== null) {
+                    let dx = mouseX - p.x;
+                    let dy = mouseY - p.y;
+                    let dist = Math.hypot(dx, dy);
+                    if (dist < 100) {
+                        let angle = Math.atan2(dy, dx);
+                        let force = (100 - dist) / 100 * 0.5;
+                        p.x += Math.cos(angle) * force;
+                        p.y += Math.sin(angle) * force;
+                    }
+                }
+
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(0, 210, 255, ${p.alpha})`;
+                ctx.fill();
+            }
+
+            if (showConnections) {
+                for (let i = 0; i < particles.length; i++) {
+                    for (let j = i + 1; j < particles.length; j++) {
+                        let dx = particles[i].x - particles[j].x;
+                        let dy = particles[i].y - particles[j].y;
+                        let dist = Math.hypot(dx, dy);
+                        if (dist < 100) {
+                            ctx.beginPath();
+                            ctx.moveTo(particles[i].x, particles[i].y);
+                            ctx.lineTo(particles[j].x, particles[j].y);
+                            ctx.strokeStyle = `rgba(0, 210, 255, ${0.2 * (1 - dist / 100)})`;
+                            ctx.lineWidth = 0.5;
+                            ctx.stroke();
+                        }
+                    }
+                }
+            }
+
+            requestAnimationFrame(drawParticles);
+        }
+
+        function handleMouseMove(e) {
+            mouseX = e.clientX;
+            mouseY = e.clientY;
+        }
+        function handleMouseLeave() {
+            mouseX = null;
+            mouseY = null;
+        }
+
+        window.addEventListener('resize', () => {
+            resizeCanvas();
+            initParticles(particleCount);
+        });
+        resizeCanvas();
+        initParticles(particleCount);
+        drawParticles();
+        window.addEventListener('mousemove', handleMouseMove);
+        window.addEventListener('mouseleave', handleMouseLeave);
+
+        // --- Menu mobile, scroll spy, paramètres ---
+        const menuToggle = document.getElementById('menuToggle');
+        const navLinks = document.getElementById('navLinks');
+        const settingsFloat = document.getElementById('settingsFloat');
+        const settingsPanel = document.getElementById('settingsPanel');
+        const closeSettings = document.getElementById('closeSettings');
+
+        menuToggle.addEventListener('click', () => {
+            navLinks.classList.toggle('active');
+        });
+
+        document.querySelectorAll('.nav-links a').forEach(link => {
+            link.addEventListener('click', () => {
+                navLinks.classList.remove('active');
+            });
+        });
+
+        settingsFloat.addEventListener('click', () => {
+            settingsPanel.classList.toggle('show');
+        });
+
+        closeSettings.addEventListener('click', () => {
+            settingsPanel.classList.remove('show');
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!settingsPanel.contains(e.target) && !settingsFloat.contains(e.target)) {
+                settingsPanel.classList.remove('show');
+            }
+        });
+
+        const sections = document.querySelectorAll('section[id]');
+        const navLinksA = document.querySelectorAll('.nav-links a[href^="#"]');
+        window.addEventListener('scroll', () => {
+            let current = '';
+            sections.forEach(section => {
+                const sectionTop = section.offsetTop - 100;
+                if (scrollY >= sectionTop) {
+                    current = section.getAttribute('id');
+                }
+            });
+            navLinksA.forEach(link => {
+                link.classList.remove('active');
+                if (link.getAttribute('href') === `#${current}`) {
+                    link.classList.add('active');
+                }
+            });
+        });
+
+        // --- Thème, particules, connexions, vitesse des phrases, police éditeur ---
+        const themeSelect = document.getElementById('themeSelect');
+        const particleSlider = document.getElementById('particleCountSlider');
+        const particleCountValue = document.getElementById('particleCountValue');
+        const showConnectionsCheckbox = document.getElementById('showConnectionsCheckbox');
+        const phraseSpeedSlider = document.getElementById('phraseSpeedSlider');
+        const phraseSpeedValue = document.getElementById('phraseSpeedValue');
+        const editorFontSize = document.getElementById('editorFontSize');
+
+        const savedTheme = localStorage.getItem('theme') || 'dark';
+        const savedParticleCount = localStorage.getItem('particleCount') || '120';
+        const savedShowConnections = localStorage.getItem('showConnections') !== 'false';
+        const savedPhraseSpeed = localStorage.getItem('phraseSpeed') || '5';
+        const savedEditorFont = localStorage.getItem('editorFontSize') || '0.9rem';
+
+        themeSelect.value = savedTheme;
+        particleSlider.value = savedParticleCount;
+        particleCountValue.innerText = savedParticleCount;
+        particleCount = parseInt(savedParticleCount);
+        showConnectionsCheckbox.checked = savedShowConnections;
+        showConnections = savedShowConnections;
+        phraseSpeedSlider.value = savedPhraseSpeed;
+        phraseSpeedValue.innerText = savedPhraseSpeed;
+        editorFontSize.value = savedEditorFont;
+
+        if (savedTheme === 'light') {
+            document.body.classList.add('light-mode');
+        }
+
+        document.getElementById('codeInput').style.fontSize = savedEditorFont;
+
+        themeSelect.addEventListener('change', () => {
+            const theme = themeSelect.value;
+            if (theme === 'light') {
+                document.body.classList.add('light-mode');
+            } else {
+                document.body.classList.remove('light-mode');
+            }
+            localStorage.setItem('theme', theme);
+        });
+
+        particleSlider.addEventListener('input', () => {
+            const val = particleSlider.value;
+            particleCountValue.innerText = val;
+            particleCount = parseInt(val);
+            initParticles(particleCount);
+            localStorage.setItem('particleCount', val);
+        });
+
+        showConnectionsCheckbox.addEventListener('change', () => {
+            showConnections = showConnectionsCheckbox.checked;
+            localStorage.setItem('showConnections', showConnections);
+        });
+
+        let phraseInterval;
+        function startPhraseRotation(speedSec) {
+            if (phraseInterval) clearInterval(phraseInterval);
+            phraseInterval = setInterval(updatePhrase, speedSec * 1000);
+        }
+        phraseSpeedSlider.addEventListener('input', () => {
+            const val = phraseSpeedSlider.value;
+            phraseSpeedValue.innerText = val;
+            localStorage.setItem('phraseSpeed', val);
+            startPhraseRotation(parseFloat(val));
+        });
+
+        editorFontSize.addEventListener('change', () => {
+            const size = editorFontSize.value;
+            document.getElementById('codeInput').style.fontSize = size;
+            localStorage.setItem('editorFontSize', size);
+        });
+
+        // --- Phrases rotatives ---
+        const phrases = [
+            "✨ Code propre, esprit clair ✨",
+            "🔍 Analyser, c'est comprendre 🔍",
+            "⚙️ Compilation fluide, zéro erreur ⚙️",
+            "📝 Votre code, notre passion 📝",
+            "🚀 Optimisez vos scripts PHP 🚀",
+            "💡 La syntaxe parfaite n'est qu'à un clic 💡",
+            "🛡️ Détection d'erreurs en temps réel 🛡️",
+            "🎯 Précision lexicale et syntaxique 🎯",
+            "📊 Statistiques instantanées 📊",
+            "🌐 Open source et collaboratif 🌐"
+        ];
+        let phraseIndex = 0;
+        const rotatingPhraseElement = document.getElementById('rotatingPhrase');
+        function updatePhrase() {
+            if (rotatingPhraseElement) {
+                rotatingPhraseElement.style.opacity = '0';
+                setTimeout(() => {
+                    rotatingPhraseElement.textContent = phrases[phraseIndex];
+                    rotatingPhraseElement.style.opacity = '1';
+                }, 200);
+                phraseIndex = (phraseIndex + 1) % phrases.length;
+            }
+        }
+        startPhraseRotation(parseFloat(savedPhraseSpeed));
+        updatePhrase();
+
+        // --- Analyseur lexical (identique) ---
+        const keywords = new Set([
+            "abstract", "and", "array", "as", "break", "callable", "case", "catch", "class",
+            "clone", "const", "continue", "declare", "default", "die", "do", "echo", "else",
+            "elseif", "empty", "enddeclare", "endfor", "endforeach", "endif", "endswitch",
+            "endwhile", "eval", "exit", "extends", "final", "finally", "fn", "for", "foreach",
+            "function", "global", "goto", "if", "implements", "include", "include_once",
+            "instanceof", "insteadof", "interface", "isset", "list", "match", "namespace",
+            "new", "or", "print", "private", "protected", "public", "readonly", "require",
+            "require_once", "return", "static", "switch", "throw", "trait", "try", "unset",
+            "use", "var", "while", "xor", "yield"
+        ]);
+
+        function tokenize(code) {
+            const tokenRegex = /(\b(?:[a-zA-Z_][a-zA-Z0-9_]*)\b)|("[^"\\]*(\\.[^"\\]*)*"|'[^'\\]*(\\.[^'\\]*)*')|\/\/.*?$|\/\*[\s\S]*?\*\/|\$[a-zA-Z_][a-zA-Z0-9_]*|\b\d+(?:\.\d+)?\b|[{}()\[\]<>!&|?:;,=+\-*/%]|./g;
+            let tokens = [];
+            let match;
+            let line = 1;
+            while ((match = tokenRegex.exec(code)) !== null) {
+                let value = match[0];
+                if (value === '\n') {
+                    line++;
+                    continue;
+                }
+                let type = "UNKNOWN";
+                if (keywords.has(value)) type = "KEYWORD";
+                else if (value.match(/^"[^"\\]*(\\.[^"\\]*)*"|^'[^'\\]*(\\.[^'\\]*)*'$/)) type = "STRING";
+                else if (value.match(/^\/\/.*$|^\/\*[\s\S]*?\*\/$/)) type = "COMMENT";
+                else if (value.match(/^\$[a-zA-Z_][a-zA-Z0-9_]*$/)) type = "VARIABLE";
+                else if (value.match(/^\d+(?:\.\d+)?$/)) type = "NUMBER";
+                else if (value.match(/^[{}()\[\]<>!&|?:;,=+\-*/%]$/)) type = "OPERATOR";
+                else if (value.trim() === "") continue;
+                else type = "UNKNOWN";
+                tokens.push({ type, value, line });
+            }
+            return tokens;
+        }
+
+        function updateDemo() {
+            const code = document.getElementById('codeInput').value;
+            const tokens = tokenize(code);
+            const outputDiv = document.getElementById('tokenOutput');
+            if (tokens.length === 0) {
+                outputDiv.innerHTML = '<div class="token-line">Aucun token trouvé.</div>';
+                return;
+            }
+            let html = '';
+            for (let t of tokens) {
+                html += `<div class="token-line">
+                            <span class="token-line-num">${t.line}</span>
+                            <span class="token-type">${t.type}</span>
+                            <span class="token-value">${escapeHtml(t.value)}</span>
+                         </div>`;
+            }
+            outputDiv.innerHTML = html;
+        }
+
+        function escapeHtml(str) {
+            return str.replace(/[&<>]/g, function(m) {
+                if (m === '&') return '&amp;';
+                if (m === '<') return '&lt;';
+                if (m === '>') return '&gt;';
+                return m;
+            });
+        }
+
+        const codeInput = document.getElementById('codeInput');
+        const resetBtn = document.getElementById('resetBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const compileBtn = document.getElementById('compileBtn');
+
+        resetBtn.addEventListener('click', () => {
+            codeInput.value = `<?php\n$x = 10;\nif ($x > 5) {\n    echo "Succès";\n}\n?>`;
+            updateDemo();
+        });
+
+        clearBtn.addEventListener('click', () => {
+            document.getElementById('tokenOutput').innerHTML = '<div class="token-line">Tokens effacés.</div>';
+        });
+
+        compileBtn.addEventListener('click', () => {
+            updateDemo();
+        });
+
+        codeInput.addEventListener('input', updateDemo);
+        updateDemo();
+
+        document.getElementById('learnMore').addEventListener('click', (e) => {
+            e.preventDefault();
+            document.getElementById('features').scrollIntoView({ behavior: 'smooth' });
+        });
+        document.querySelectorAll('.nav-links a[href^="#"]').forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                const target = document.querySelector(link.getAttribute('href'));
+                if (target) target.scrollIntoView({ behavior: 'smooth' });
+            });
+        });
+    </script>
+</body>
+</html>
